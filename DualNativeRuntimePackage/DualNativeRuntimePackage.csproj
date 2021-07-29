@@ -11,6 +11,7 @@
 
     <!-- Package Info -->
     <Description>Test package please ignore</Description>
+    <Version>1.0.1</Version>
 
     <!-- This package is only for native runtime, don't try to build/pack the .NET assembly or specify a framework dependency -->
     <IncludeBuildOutput>false</IncludeBuildOutput>

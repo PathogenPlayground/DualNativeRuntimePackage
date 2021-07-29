@@ -27,7 +27,7 @@ jobs:
             name: Windows
             libpath: build/bin/libclang.dll
             buildcommand: ./build-native.cmd
-          - os: ubuntu-latest
+          - os: ubuntu-18.04
             name: Linux
             libpath: build-linux/lib/libclang.so
             buildcommand: ./build-native.sh
