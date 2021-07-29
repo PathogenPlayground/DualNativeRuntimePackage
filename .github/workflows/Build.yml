@@ -1,0 +1,106 @@
+name: ClangSharp.Pathogen
+on:
+  push:
+    branches: ['*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      will_publish_packages:
+        description: "Publish packages?"
+        default: "false"
+      preview_release_version:
+        description: "Preview release version"
+        default: ""
+      do_full_release:
+        description: "Full release?"
+        default: "false"
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_GENERATE_ASPNET_CERTIFICATE: false
+jobs:
+  build-llvm:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+            libpath: build/bin/libclang.dll
+            buildcommand: ./build-native.cmd
+          - os: ubuntu-latest
+            name: Linux
+            libpath: build-linux/lib/libclang.so
+            buildcommand: ./build-native.sh
+    name: Build LLVM (${{matrix.name}})
+    runs-on: ${{matrix.os}}
+    steps:
+      # ----------------------------------------------------------------------- Checkout
+      - name: Checkout
+        # We intentionally don't checkout submodules here
+        # They will be restored as needed only if we need to build LLVM.
+        uses: actions/checkout@v2
+
+      - name: Build LLVM
+        run: ${{matrix.buildcommand}}
+
+      - name: Upload LLVM build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: LlvmBuildOutputs-${{matrix.name}}
+          if-no-files-found: error
+          # This paths listed here must match "Load cached LLVM build outputs" above
+          path: ${{matrix.libpath}}
+
+  build-dotnet:
+    name: Build ClangSharp.Pathogen
+    runs-on: ubuntu-latest
+    needs: build-llvm
+    outputs:
+      publish-to-github: ${{steps.configuration.outputs.publish-to-github}}
+    steps:
+      # ----------------------------------------------------------------------- Checkout
+      - name: Checkout
+        uses: actions/checkout@v2
+        # Sadly we need to check out submodules here to make SourceLink happy.
+        # (Ideally we'd just archive libclang.dll along with the handful of files ClangSharp.Pathogen.Runtime needs to build the NuGet package.)
+        with:
+          submodules: 'recursive'
+
+      # ----------------------------------------------------------------------- Setup .NET
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 5.0.x
+
+      # ----------------------------------------------------------------------- Download LLVM Build
+      - name: Download LLVM Windows build artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: LlvmBuildOutputs-Windows
+          path: build/bin/
+      - name: Download LLVM Linux build artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: LlvmBuildOutputs-Linux
+          path: build-linux/lib/
+
+      # ----------------------------------------------------------------------- Build ClangSharp.Pathogen
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        id: build
+        run: dotnet build --no-restore
+
+      - name: Pack
+        id: pack
+        run: dotnet pack --no-build
+
+      # ----------------------------------------------------------------------- Collect Artifacts
+      - name: Collect NuGet Packages
+        uses: actions/upload-artifact@v2
+        # We always want to collect packages when they were produced
+        if: steps.pack.outcome == 'success' && always()
+        with:
+          name: Packages
+          path: packages/**

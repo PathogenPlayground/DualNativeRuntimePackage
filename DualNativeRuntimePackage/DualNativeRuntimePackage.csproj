@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)../packages/</PackageOutputPath>
+
+    <!-- Paths to LLVM things -->
+    <LibClangPathogenPath_Windows>$(MSBuildThisFileDirectory)../build/bin/libclang.dll</LibClangPathogenPath_Windows>
+    <LibClangPathogenPath_Linux>$(MSBuildThisFileDirectory)../build-linux/lib/libclang.so</LibClangPathogenPath_Linux>
+
+    <!-- Package Info -->
+    <Description>Test package please ignore</Description>
+
+    <!-- This package is only for native runtime, don't try to build/pack the .NET assembly or specify a framework dependency -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(LibClangPathogenPath_Windows)')">
+    <None Include="$(LibClangPathogenPath_Windows)" Link="libclang-pathogen.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>runtimes/win-x64/native/libclang-pathogen.dll</PackagePath>
+    </None>
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(LibClangPathogenPath_Linux)')">
+    <None Include="$(LibClangPathogenPath_Linux)" Link="libclang-pathogen.so">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>true</Pack>
+      <PackagePath>runtimes/linux-x64/native/libclang-pathogen.so</PackagePath>
+    </None>
+  </ItemGroup>
+  <!-- Error if native runtime needs to be built or llvm-project is missing -->
+  <Target Name="_NativeRuntimeChecks" BeforeTargets="Build;Pack">
+    <Error Text="Custom libclang.dll is missing, run `build-native.cmd` in the solution root to build it." Condition="!Exists('$(LibClangPathogenPath_Windows)')" />
+    <Error Text="Custom libclang.so is missing, run `build-native.sh` in the solution root to build it." Condition="!Exists('$(LibClangPathogenPath_Linux)')" />
+  </Target>
+</Project>

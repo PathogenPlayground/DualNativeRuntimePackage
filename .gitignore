@@ -1,0 +1,8 @@
+.vs/
+bin/
+obj/
+/build/
+/build-linux/
+/*.obj
+/*.o
+/packages/
