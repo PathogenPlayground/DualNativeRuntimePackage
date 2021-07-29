@@ -25,11 +25,11 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-            libpath: build/bin/libclang.dll
+            lib-path: build/bin/libclang.dll
             build-command: ./build-native.cmd
           - os: ubuntu-18.04
             name: Linux
-            libpath: build-linux/lib/libclang.so
+            lib-path: build-linux/lib/libclang.so
             build-command: ./build-native.sh
     name: Build LLVM (${{matrix.name}})
     runs-on: ${{matrix.os}}
@@ -40,8 +40,25 @@ jobs:
         # They will be restored as needed only if we need to build LLVM.
         uses: actions/checkout@v2
 
+      - name: Load cached LLVM build outputs
+        id: cached-llvm
+        uses: actions/cache@v2
+        with:
+          key: llvm-output-${{runner.os}}-${{steps.llvm.outputs.revision}}
+          # These are the paths of the external files required in ClangSharp.Pathogen.Runtime.csproj
+          # (Make sure this is syncronized with "Archive LLVM Outputs" below)
+          path: ${{matrix.lib-path}}
+
       - name: Build LLVM
         run: ${{matrix.build-command}}
+
+      # The GitHub Actions cache gets confused by the symlink so we need to remove it
+      - name: Unsymlink libclang
+        if: steps.cached-llvm.outputs.cache-hit != 'true' && runner.os == 'Linux'
+        run: |
+          cp ${{matrix.lib-path}} ${{matrix.lib-path}}-nosymlink
+          rm ${{matrix.lib-path}}
+          mv ${{matrix.lib-path}}-nosymlink ${{matrix.lib-path}}
 
       - name: Upload LLVM build artifacts
         uses: actions/upload-artifact@v2
@@ -49,7 +66,7 @@ jobs:
           name: LlvmBuildOutputs-${{matrix.name}}
           if-no-files-found: error
           # This paths listed here must match "Load cached LLVM build outputs" above
-          path: ${{matrix.libpath}}
+          path: ${{matrix.lib-path}}
 
   build-dotnet:
     name: Build ClangSharp.Pathogen
